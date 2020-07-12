@@ -10,6 +10,9 @@ import shutil
 import config_project
 
 
+
+
+
 def on_tab_selected(event):
     selected_tab = event.widget.select()
     tab_text = event.widget.tab(selected_tab, "text")
@@ -73,6 +76,8 @@ def image_path(file_path):
     return image
 
 def load_photo_tab_one(file_path):
+    global imgLabelTabOne
+
     image = image_path(file_path)
     imgLabelTabOne.configure(image=image)
     imgLabelTabOne.image = image
@@ -116,7 +121,7 @@ def insert_database(sun_name_field, first_name_field, middle_name_field, phone_n
         sql = "INSERT INTO tbl_student(SurnName, FirstName, MiddleName," \
               "PhoneNumber, EmailAddress, Gender, 1stCourse, 2ndCourse, Duration_1stCourse," \
               "Duration2ndCourse, Amount_1stCourse, Amount_2ndCourse, Total_Amount, Photo)" \
-              "Values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+              "Values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         vals = (sun_name_field, first_name_field, middle_name_field, phone_number_field, email_address_field,
                 gender_field,
                 first_course_field,
@@ -152,8 +157,6 @@ def add_new_record():
     global blank_text_boxes_tab_two
     global file_new_home
     global file_to_copy
-
-
     blank_text_box_count = 0
     if SurName_For_TabOne.get() is "":
         blank_text_box_count += 1
@@ -211,6 +214,75 @@ def add_new_record():
         else:
             messagebox.showinfo("File Error", "Please Select an Image")
 
+def delete():
+    global delete_box
+    try:
+        con = connection()
+        cursor = con.cursor()
+        cursor.execute("DELETE from tbl_student WHERE ID= " + delete_box.get())
+
+        delete_box.delete(0, tk.END)
+
+        con.commit()
+        messagebox.showinfo('Delete Status', ' Successful Deletion of Record')
+        has_loaded_successfully = True
+        con.close()
+    except pymysql.InternalError as e:
+        has_loaded_successfully = database_error(e)
+    except pymysql.OperationalError as e:
+        has_loaded_successfully = database_error(e)
+    except pymysql.ProgrammingError as e:
+        has_loaded_successfully = database_error(e)
+    except pymysql.DataError as e:
+        has_loaded_successfully = database_error(e)
+    except pymysql.IntegrityError as e:
+        has_loaded_successfully = database_error(e)
+    except pymysql.NotSupportedError as e:
+        has_loaded_successfully = database_error(e)
+    return has_loaded_successfully
+
+
+def scroll_data():
+    SurName_For_TabOne.set(rows[column_counter][1])
+    FirstName_For_TabOne.set(rows[column_counter][2])
+    MiddleName_For_TabOne.set(rows[column_counter][3])
+    PhoneNumber_For_TabOne .set(rows[column_counter][4])
+    Email_For_TabOne.set(rows[column_counter][5])
+    Gender_For_TabOne.set(rows[column_counter][6])
+    course_2.set(rows[column_counter][7])
+    course_1.set(rows[column_counter][8])
+    First_Duration_For_TabOne.set(rows[column_counter][9])
+    First_Amount_For_TabOne.set(rows[column_counter][10])
+    Second_Duration_For_TabOne.set(rows[column_counter][11])
+    Second_Amount_For_TabOne.set(rows[column_counter][12])
+    Total_Amount_For_TabOne.set(rows[column_counter][13])
+
+    try:
+        ph_path = config_project.PHOTO_DIRECTORY + rows[column_counter][14]
+        load_photo_tab_one(ph_path)
+    except FileNotFoundError:
+        load_photo_tab_one(config_project.PHOTO_DIRECTORY + file_name)
+
+
+def scroll_right():
+    global column_counter
+    global num_of_rows
+
+    if column_counter >= (num_of_rows - 1):
+        messagebox.showinfo("Database Error", "End of Database")
+    else:
+        column_counter = column_counter + 1
+        scroll_data()
+
+
+def scroll_left():
+    global column_counter
+    if column_counter is 0:
+        messagebox.showinfo("Database Error", "End of Database")
+    else:
+        column_counter = column_counter - 1
+        scroll_data()
+
 
 # Total amount function
 def total_am():
@@ -259,10 +331,41 @@ def clear():
     totalamountEntryTabOne.delete(0, tk.END)
 
 
+# SEARCH METHOD
+def search_records():
+    global search_text_var
+    global options_var
+    try:
+
+        con = connection()
+        sql_query = "SELECT * FROM tbl_student WHERE FirstName=%s AND 1stCourse=%s"
+        vals = (search_text_var.get(), options_var.get())
+        cursor = con.cursor()
+        cursor.execute(sql_query, vals)
+        my_rows = cursor.fetchall()
+        total_rows = cursor.rowcount
+        cursor.close()
+        con.close()
+        messagebox.showinfo("TOTAL FOUND: ", 'Record Found:' + str(total_rows) + " " + "\n\n" + str(my_rows))
+    except pymysql.InternalError as e:
+        database_error(e)
+    except pymysql.OperationalError as e:
+        database_error(e)
+    except pymysql.ProgrammingError as e:
+        database_error(e)
+    except pymysql.DataError as e:
+        database_error(e)
+    except pymysql.IntegrityError as e:
+        database_error(e)
+    except pymysql.NotSupportedError as e:
+        database_error(e)
+
+
 file_name = "default.png"
 path = config_project.PHOTO_DIRECTORY + file_name
 rows = None  # none is an object that contains nothing
 num_of_rows = None
+column_counter=0
 
 
 image_selected = False
@@ -271,11 +374,9 @@ file_to_copy = None
 file_new_home = None
 blank_text_boxes_tab_two = False
 
-form = tk.Tk()
+form =tk.Tk()
 form.title("Student's Database")
-form.geometry("500x280")
-form.configure(background='blue')
-
+form.geometry("1200x480")
 tab_parent = ttk.Notebook(form)
 tab_1 = ttk.Frame(tab_parent)
 tab_2 = ttk.Frame(tab_parent)
@@ -283,10 +384,10 @@ tab_2 = ttk.Frame(tab_parent)
 tab_parent.bind("<<NotebookTabChanged>>")
 
 tab_parent.add(tab_1, text="All  Students Records")
-tab_parent.add(tab_2, text="Add New Records")
+tab_parent.add(tab_2, text="Search")
 
-course_2 = tk.StringVar()  # add form in bracket
-course_1 = tk.StringVar(form)
+course_2 = tk.StringVar()
+course_1 = tk.StringVar()
 SurName_For_TabOne = tk.StringVar()
 FirstName_For_TabOne = tk.StringVar()
 MiddleName_For_TabOne = tk.StringVar()
@@ -299,6 +400,7 @@ Second_Duration_For_TabOne = tk.StringVar()
 Second_Amount_For_TabOne = tk.StringVar()
 Total_Amount_For_TabOne = tk.StringVar()
 
+
 # First DropDOwn Menu
 courses = ['course', 'Python', 'Web Development', 'COMPTIA', 'CCNA', 'ORACLE', 'Java']
 course_1.set(courses[0])
@@ -309,7 +411,7 @@ Label(tab_1, text="choose a course :").grid(row=3, column=1, padx=15, pady=15)
 popupmenue.grid(row=3, column=2, padx=15, pady=15)
 
 # second dropdown
-course_two_drop_down = ['course', 'Python', 'Web Development', 'COMPTIA', 'ORACLE', 'CCNA', 'Java']
+courses = ['course', 'Python', 'Web Development', 'COMPTIA', 'ORACLE', 'CCNA', 'Java']
 course_2.set(courses[0])
 
 popupmenue = OptionMenu(tab_1, course_2, *courses)
@@ -331,6 +433,8 @@ course2LabelTabOne = tk.Label(tab_1, text="2nd Course of Study")
 duration2LabelTabOne = tk.Label(tab_1, text="Duration of 2nd Course of Study")
 amount2LabelTabOne = tk.Label(tab_1, text="Amount Paid for 2nd Course")
 totalamountLabelTabOne = tk.Label(tab_1, text="Total Amount Paid")
+delete_Label = tk.Label(tab_1, text=' Enter ID number :').grid(row=7, column=4, pady=(180, 0))
+Id_Label = tk.Label(tab_1, text="Student ID :").grid(row=3, column=5)
 
 LastEntryTabOne = tk.Entry(tab_1, textvariable=SurName_For_TabOne)
 firstEntryTabOne = tk.Entry(tab_1, textvariable=FirstName_For_TabOne)
@@ -345,6 +449,8 @@ course2EntryTabOne = tk.Entry(tab_1, textvariable=course_2)
 duration2EntryTabOne = tk.Entry(tab_1, textvariable=Second_Duration_For_TabOne)
 amount2EntryTabOne = tk.Entry(tab_1, textvariable=Second_Amount_For_TabOne)
 totalamountEntryTabOne = tk.Entry(tab_1, textvariable=Total_Amount_For_TabOne)
+Id_Entry = tk.Entry(tab_1, textvariable=Id_Label).grid(row=3, column=6)
+
 
 openImageTabOne = Image.open(path)
 imgTabOne = ImageTk.PhotoImage(openImageTabOne, master=tab_1)
@@ -354,9 +460,12 @@ imgLabelTabOne = tk.Label(tab_1, image=imgTabOne)
 buttonAmount = tk.Button(tab_1, text="total amount", command=total_am)
 buttonAddImage = tk.Button(tab_1, text="Add Image", command=select_image)
 buttonAddRecord = tk.Button(tab_1, text="Add New Record", command=add_new_record)
-buttonDisplay = tk.Button(tab_1, text='Display Records', command=display)
-buttonDelete = tk.Button(tab_1, text="Delete Record")
-buttonClear = tk.Button(tab_1, text='Clear', command=clear)
+buttonDisplay = tk.Button(tab_1, text='Display Records', command=display)#
+buttonDelete = tk.Button(tab_1, text="Delete Record", command=delete)
+buttonClear = tk.Button(tab_1, text='Clear', command=clear)#
+buttonPrevious = tk.Button(tab_1, text='Previous Records', command=scroll_left)
+buttonNext = tk.Button(tab_1, text='Next Records', command=scroll_right)
+
 
 # WIDGETS
 
@@ -382,16 +491,48 @@ amountEntryTabOne.grid(row=5, column=2, padx=15, pady=15)
 amount2LabelTabOne.grid(row=5, column=3, padx=15, pady=15)
 amount2EntryTabOne.grid(row=5, column=4, padx=15, pady=15)
 totalamountEntryTabOne.grid(row=6, column=3, padx=15, pady=15)
+delete_box = Entry(tab_1, width=30,)
+delete_box.grid(row=7, column=5, pady=(180, 0))
 
 imgLabelTabOne.grid(row=0, column=0, rowspan=3, padx=20, pady=20)
 
-buttonAddRecord.grid(row=7, column=3, padx=15, pady=15)
+buttonAddRecord.grid(row=7, column=3, padx=15, pady=(200, 0))
 buttonAmount.grid(row=6, column=2, padx=15, pady=15)
 buttonAddImage.grid(row=4, column=0)
-buttonDisplay.grid(row=7, column=1, padx=15)
-buttonDelete.grid(row=7, column=4)
-buttonClear.grid(row=7, column=2)
+buttonDisplay.grid(row=7, column=1, padx=15, pady=(200, 0))
+buttonDelete.grid(row=8, column=5)
+
+buttonClear.grid(row=7, column=2, pady=(200, 0))
+buttonPrevious.grid(row=7, column=0, pady=(200, 0))
+buttonNext.grid(row=7, column=6, pady=(200, 0))
+
+# Second Tab
+search_text_var = tk.StringVar()
+search_family = tk.Entry(tab_2, textvariable=search_text_var)
+
+contents = {'ORACLE', 'JAVA', 'Python', 'Web Development', 'COMPTIA', 'CCNA'}
+
+
+options_var = tk.StringVar()
+
+options_var.set("Select 1stCourse")
+dropdown = tk.OptionMenu(tab_2, options_var, *contents)
+
+buttonSearch = tk.Button(tab_2, text='Search', command=search_records)
+
+search_family.grid(row=0, column=0, padx=15, pady=15)
+dropdown.grid(row=0, column=1, padx=15, pady=15)
+buttonSearch.grid(row=0, column=2, padx=15, pady=15)
+
+#create an update
+editButton = Button(tab_2, text='EDIT RECORDS')
+editButton.grid(row=1, column=0, columnspan=3, ipadx=135)
 
 
 tab_parent.pack(expand=1, fill="both")
 form.mainloop()
+
+
+
+
+
